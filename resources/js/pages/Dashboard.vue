@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
+import axios from 'axios';
+import { onMounted } from 'vue';
 import PlaceholderPattern from '@/components/PlaceholderPattern.vue';
 import { dashboard } from '@/routes';
-import { onMounted } from 'vue';
-import axios from 'axios'
 
 defineOptions({
     layout: {
@@ -18,13 +18,13 @@ defineOptions({
 
 onMounted(async () => {
     try {
-        const response = await axios.get('/api/products')
+        const response = await axios.get('/api/products');
 
-        console.log(response.data)
+        console.log(response.data);
     } catch (error) {
-        console.error(error)
+        console.error(error);
     }
-})
+});
 </script>
 
 <template>

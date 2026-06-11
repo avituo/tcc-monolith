@@ -10,7 +10,7 @@ class Product extends Model
 {
     use HasFactory;
 
-    public $fillable = [
+    protected $fillable = [
         'name',
         'description',
         'image',
@@ -21,6 +21,15 @@ class Product extends Model
         'quantity',
         'is_active',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'price' => 'decimal:2',
+            'discount' => 'decimal:2',
+            'is_active' => 'boolean',
+        ];
+    }
 
     public function orders(): BelongsToMany
     {
