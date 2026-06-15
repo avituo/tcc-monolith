@@ -18,11 +18,11 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         User::factory(100)->create();
-        Product::factory(500)->create();
+        Product::factory(1000)->create();
         Order::factory()
-            ->count(1000)
+            ->count(5000)
             ->create()
-            ->each(function ($order) {
+            ->each(function (Order $order): void {
                 $products = Product::inRandomOrder()
                     ->limit(rand(1, 5))
                     ->get();
