@@ -11,11 +11,19 @@ class Order extends Model
 {
     use HasFactory;
 
+    protected $attributes = [
+        'status' => 'pending',
+    ];
+
     protected $fillable = [
         'name',
         'user_id',
+        'user_name_snapshot',
+        'user_email_snapshot',
         'total_price',
         'status',
+        'idempotency_key',
+        'idempotency_request_hash',
     ];
 
     protected function casts(): array
@@ -33,7 +41,15 @@ class Order extends Model
     public function products(): BelongsToMany
     {
         return $this->belongsToMany(Product::class)
-            ->withPivot(['quantity', 'unit_price', 'subtotal'])
+            ->withPivot([
+                'product_name',
+                'product_sku',
+                'quantity',
+                'list_price',
+                'discount',
+                'unit_price',
+                'subtotal',
+            ])
             ->withTimestamps();
     }
 }

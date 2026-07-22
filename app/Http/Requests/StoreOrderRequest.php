@@ -10,7 +10,7 @@ class StoreOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user() !== null;
     }
 
     /**
@@ -22,7 +22,7 @@ class StoreOrderRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'status' => ['required', Rule::in(['pending', 'paid', 'cancelled'])],
+            'status' => ['required', Rule::in(['pending'])],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'distinct', 'exists:products,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:9999'],

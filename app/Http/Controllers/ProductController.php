@@ -9,7 +9,6 @@ use App\Services\ProductService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -63,11 +62,13 @@ class ProductController extends Controller
 
     public function destroy(Product $product): RedirectResponse
     {
-        DB::transaction(function () use ($product): void {
-            $product->orders()->detach();
+        if ($product->orders()->exists()) {
+            $product->update(['is_active' => false]);
+            Inertia::flash('toast', ['type' => 'success', 'message' => 'Product deactivated to preserve order history.']);
+        } else {
             $product->delete();
-        });
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Product deleted successfully.']);
+            Inertia::flash('toast', ['type' => 'success', 'message' => 'Product deleted successfully.']);
+        }
 
         return to_route('products.index');
     }
@@ -90,8 +91,6 @@ class ProductController extends Controller
      */
     private function productAttributes(array $attributes): array
     {
-        $attributes['image'] ??= '';
-
         return $attributes;
     }
 }

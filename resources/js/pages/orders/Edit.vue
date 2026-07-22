@@ -26,7 +26,7 @@ defineOptions({
     <div class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
         <Heading
             :title="`Edit ${order.name}`"
-            description="Update the order status and product line items."
+            description="Update the product line items while the order is pending."
         />
         <div class="rounded-xl border bg-card p-6">
             <OrderForm

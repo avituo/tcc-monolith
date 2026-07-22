@@ -68,7 +68,7 @@ class ProductCrudTest extends TestCase
         $this->assertDatabaseHas('products', [
             'id' => $product->id,
             'name' => 'Mechanical Keyboard Pro',
-            'image' => '',
+            'image' => null,
             'is_active' => false,
         ]);
 
@@ -82,8 +82,9 @@ class ProductCrudTest extends TestCase
         $this->actingAs($user)
             ->delete(route('products.destroy', $product))
             ->assertRedirect(route('products.index'));
-        $this->assertModelMissing($product);
-        $this->assertDatabaseCount('order_product', 0);
+        $this->assertModelExists($product);
+        $this->assertFalse($product->refresh()->is_active);
+        $this->assertDatabaseCount('order_product', 1);
     }
 
     public function test_product_validation_rejects_invalid_pricing_and_duplicate_skus(): void

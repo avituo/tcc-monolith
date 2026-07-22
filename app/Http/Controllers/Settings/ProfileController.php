@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -52,7 +53,17 @@ class ProfileController extends Controller
 
         Auth::logout();
 
-        $user->delete();
+        if ($user->orders()->exists()) {
+            $anonymousId = (string) Str::uuid();
+            $user->forceFill([
+                'name' => 'Deleted User',
+                'email' => "deleted+$anonymousId@example.invalid",
+                'email_verified_at' => null,
+                'password' => Str::random(64),
+            ])->save();
+        } else {
+            $user->delete();
+        }
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

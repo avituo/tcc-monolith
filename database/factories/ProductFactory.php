@@ -13,14 +13,15 @@ class ProductFactory extends Factory
     public function definition(): array
     {
         $name = fake()->unique()->words(rand(2, 4), true);
+        $price = fake()->randomFloat(2, 10, 5000);
 
         return [
             'name' => ucfirst($name),
             'description' => fake()->paragraph(),
             'slug' => Str::slug($name),
             'image' => '',
-            'price' => fake()->randomFloat(2, 10, 5000),
-            'discount' => fake()->randomFloat(2, 0, 500),
+            'price' => $price,
+            'discount' => fake()->randomFloat(2, 0, $price),
             'quantity' => fake()->numberBetween(0, 500),
             'sku' => strtoupper(fake()->bothify('SKU-####??')),
             'is_active' => fake()->boolean(90),

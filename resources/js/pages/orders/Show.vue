@@ -78,10 +78,10 @@ function statusVariant(
             <div class="rounded-xl border bg-card p-5">
                 <p class="text-sm text-muted-foreground">Customer</p>
                 <p class="mt-1 font-medium">
-                    {{ order.user?.name ?? 'Unknown' }}
+                    {{ order.user_name_snapshot ?? 'Unknown' }}
                 </p>
                 <p class="text-sm text-muted-foreground">
-                    {{ order.user?.email }}
+                    {{ order.user_email_snapshot }}
                 </p>
             </div>
             <div class="rounded-xl border bg-card p-5">

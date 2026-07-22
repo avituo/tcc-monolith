@@ -10,6 +10,10 @@ class Product extends Model
 {
     use HasFactory;
 
+    protected $attributes = [
+        'is_active' => true,
+    ];
+
     protected $fillable = [
         'name',
         'description',
@@ -34,7 +38,15 @@ class Product extends Model
     public function orders(): BelongsToMany
     {
         return $this->belongsToMany(Order::class)
-            ->withPivot(['quantity', 'unit_price', 'subtotal'])
+            ->withPivot([
+                'product_name',
+                'product_sku',
+                'quantity',
+                'list_price',
+                'discount',
+                'unit_price',
+                'subtotal',
+            ])
             ->withTimestamps();
     }
 }

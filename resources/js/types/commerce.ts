@@ -1,5 +1,3 @@
-import type { User } from './auth';
-
 export type Product = {
     id: number;
     name: string;
@@ -18,6 +16,10 @@ export type Product = {
 export type OrderProduct = Product & {
     pivot: {
         quantity: number;
+        product_name: string;
+        product_sku: string;
+        list_price: string;
+        discount: string;
         unit_price: string;
         subtotal: string;
     };
@@ -27,10 +29,11 @@ export type Order = {
     id: number;
     name: string;
     user_id: number;
+    user_name_snapshot: string;
+    user_email_snapshot: string;
     total_price: string;
     status: 'pending' | 'paid' | 'cancelled';
     products_count?: number;
-    user?: Pick<User, 'id' | 'name' | 'email'>;
     products?: OrderProduct[];
     created_at: string;
     updated_at: string;

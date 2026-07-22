@@ -86,7 +86,7 @@ function money(value: string | number): string {
 
 <template>
     <Form v-bind="action" class="grid gap-6" v-slot="{ errors, processing }">
-        <div class="grid gap-6 md:grid-cols-2">
+        <div class="grid gap-6">
             <div class="grid gap-2">
                 <Label for="name">Order name</Label>
                 <Input
@@ -98,20 +98,7 @@ function money(value: string | number): string {
                 <InputError :message="errors.name" />
             </div>
 
-            <div class="grid gap-2">
-                <Label for="status">Status</Label>
-                <select
-                    id="status"
-                    name="status"
-                    :value="order?.status ?? 'pending'"
-                    class="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-                >
-                    <option value="pending">Pending</option>
-                    <option value="paid">Paid</option>
-                    <option value="cancelled">Cancelled</option>
-                </select>
-                <InputError :message="errors.status" />
-            </div>
+            <input type="hidden" name="status" value="pending" />
         </div>
 
         <section class="grid gap-4">

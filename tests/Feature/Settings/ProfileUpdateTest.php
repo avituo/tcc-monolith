@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -95,5 +96,23 @@ class ProfileUpdateTest extends TestCase
             ->assertRedirect(route('profile.edit'));
 
         $this->assertNotNull($user->fresh());
+    }
+
+    public function test_account_with_orders_is_anonymized_without_destroying_history(): void
+    {
+        $user = User::factory()->create();
+        $order = Order::factory()->for($user)->create([
+            'user_name_snapshot' => $user->name,
+            'user_email_snapshot' => $user->email,
+        ]);
+
+        $this->actingAs($user)->delete(route('profile.destroy'), [
+            'password' => 'password',
+        ])->assertRedirect(route('home'));
+
+        $this->assertSame('Deleted User', $user->refresh()->name);
+        $this->assertStringEndsWith('@example.invalid', $user->email);
+        $this->assertModelExists($order);
+        $this->assertNotSame($user->email, $order->refresh()->user_email_snapshot);
     }
 }

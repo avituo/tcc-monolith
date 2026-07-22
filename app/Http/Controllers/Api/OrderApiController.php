@@ -17,6 +17,11 @@ class OrderApiController extends Controller
     {
         return response()->json(
             $this->orderService->getListPaginated(
+                filters: [
+                    'user_id' => request()->user()->id,
+                    'name' => request()->input('name'),
+                    'status' => request()->input('status'),
+                ],
                 perPage: min(max(request()->integer('per_page', 10), 1), 100),
             ),
         );
@@ -24,13 +29,19 @@ class OrderApiController extends Controller
 
     public function show(Order $order): JsonResponse
     {
+        $this->authorize('view', $order);
+
         return response()->json($this->orderService->findWithRelations($order));
     }
 
     public function store(StoreOrderRequest $request): JsonResponse
     {
         return response()->json(
-            $this->orderService->createOrder($request->validated()),
+            $this->orderService->createOrder(
+                user: $request->user(),
+                items: $request->validated('products'),
+                idempotencyKey: $request->validated('idempotency_key'),
+            ),
             201,
         );
     }

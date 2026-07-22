@@ -98,7 +98,7 @@ function statusVariant(
                                 </p>
                             </td>
                             <td class="px-4 py-3">
-                                {{ order.user?.name ?? 'Unknown' }}
+                                {{ order.user_name_snapshot ?? 'Unknown' }}
                             </td>
                             <td class="px-4 py-3">
                                 {{ order.products_count ?? 0 }}

@@ -10,7 +10,9 @@ class UpdateOrderStatusRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $order = $this->route('order');
+
+        return $this->user()?->can('update', $order) ?? false;
     }
 
     /**
@@ -19,7 +21,7 @@ class UpdateOrderStatusRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['required', Rule::in(['pending', 'paid', 'cancelled'])],
+            'status' => ['required', Rule::in(['paid', 'cancelled'])],
         ];
     }
 }

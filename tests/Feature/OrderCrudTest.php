@@ -39,10 +39,14 @@ class OrderCrudTest extends TestCase
         $firstProduct = Product::factory()->create([
             'price' => 100,
             'discount' => 10,
+            'quantity' => 10,
+            'is_active' => true,
         ]);
         $secondProduct = Product::factory()->create([
             'price' => 25,
             'discount' => 0,
+            'quantity' => 10,
+            'is_active' => true,
         ]);
 
         $response = $this->actingAs($user)->post(route('orders.store'), [
@@ -68,7 +72,7 @@ class OrderCrudTest extends TestCase
 
         $this->actingAs($user)->put(route('orders.update', $order), [
             'name' => 'Order 1001 updated',
-            'status' => 'paid',
+            'status' => 'pending',
             'items' => [
                 ['product_id' => $secondProduct->id, 'quantity' => 3],
             ],
@@ -76,14 +80,16 @@ class OrderCrudTest extends TestCase
 
         $order->refresh();
         $this->assertSame('75.00', $order->total_price);
-        $this->assertSame('paid', $order->status);
+        $this->assertSame('pending', $order->status);
         $this->assertCount(1, $order->products);
+        $this->assertSame(7, $secondProduct->refresh()->quantity);
 
         $this->actingAs($user)
             ->delete(route('orders.destroy', $order))
             ->assertRedirect(route('orders.index'));
         $this->assertModelMissing($order);
         $this->assertDatabaseCount('order_product', 0);
+        $this->assertSame(10, $secondProduct->refresh()->quantity);
     }
 
     public function test_order_validation_requires_distinct_existing_products(): void

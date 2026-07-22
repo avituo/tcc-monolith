@@ -15,6 +15,8 @@ class OrderFactory extends Factory
         return [
             'name' => 'Pedido #'.fake()->unique()->numberBetween(1000, 99999),
             'user_id' => User::factory(),
+            'user_name_snapshot' => fake()->name(),
+            'user_email_snapshot' => fake()->safeEmail(),
             'total_price' => fake()->randomFloat(2, 50, 10000),
             'status' => fake()->randomElement([
                 'pending',
