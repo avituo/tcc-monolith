@@ -27,10 +27,10 @@ class ProductApiTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->getJson('/api/products?name=Keyboard&is_active=true&per_page=1')
+        $this->getJson('/api/v1/products?name=Keyboard&per_page=1')
             ->assertOk()
-            ->assertJsonPath('per_page', 1)
-            ->assertJsonPath('total', 1)
+            ->assertJsonPath('meta.per_page', 1)
+            ->assertJsonPath('meta.total', 1)
             ->assertJsonPath('data.0.name', 'Active Keyboard')
             ->assertJsonPath('data.0.is_active', true);
     }
@@ -40,13 +40,45 @@ class ProductApiTest extends TestCase
         $this->actingAs(User::factory()->create());
         Product::factory()->count(2)->create();
 
-        $this->getJson('/api/products?per_page=0')
-            ->assertOk()
-            ->assertJsonPath('per_page', 1);
+        $this->getJson('/api/v1/products?per_page=0')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('per_page');
     }
 
     public function test_products_require_authentication(): void
     {
-        $this->getJson('/api/products')->assertUnauthorized();
+        $this->getJson('/api/v1/products')->assertUnauthorized();
+    }
+
+    public function test_authenticated_user_can_manage_products_through_the_versioned_api(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $payload = [
+            'name' => 'Mechanical Keyboard',
+            'description' => 'Compact keyboard.',
+            'slug' => 'mechanical-keyboard',
+            'image' => null,
+            'price' => '100.00',
+            'discount' => '10.00',
+            'quantity' => 5,
+            'sku' => 'KEY-API-1',
+            'is_active' => true,
+        ];
+
+        $created = $this->postJson('/api/v1/products', $payload)
+            ->assertCreated()
+            ->assertJsonPath('data.sale_price', '90.00')
+            ->assertJsonPath('data.version', 1);
+
+        $productId = $created->json('data.id');
+        $this->getJson("/api/v1/products/{$productId}")
+            ->assertOk()
+            ->assertJsonPath('data.sku', 'KEY-API-1');
+        $this->putJson("/api/v1/products/{$productId}", [...$payload, 'name' => 'Updated Keyboard'])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Updated Keyboard')
+            ->assertJsonPath('data.version', 2);
+        $this->deleteJson("/api/v1/products/{$productId}")->assertNoContent();
+        $this->getJson("/api/v1/products/{$productId}")->assertNotFound();
     }
 }

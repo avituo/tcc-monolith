@@ -24,12 +24,18 @@ class Order extends Model
         'status',
         'idempotency_key',
         'idempotency_request_hash',
+        'reserved_at',
+        'paid_at',
+        'cancelled_at',
     ];
 
     protected function casts(): array
     {
         return [
             'total_price' => 'decimal:2',
+            'reserved_at' => 'immutable_datetime',
+            'paid_at' => 'immutable_datetime',
+            'cancelled_at' => 'immutable_datetime',
         ];
     }
 
@@ -41,6 +47,7 @@ class Order extends Model
     public function products(): BelongsToMany
     {
         return $this->belongsToMany(Product::class)
+            ->withTrashed()
             ->withPivot([
                 'product_name',
                 'product_sku',

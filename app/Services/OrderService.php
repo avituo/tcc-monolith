@@ -60,6 +60,7 @@ class OrderService
                 'status' => 'pending',
                 'idempotency_key' => $idempotencyKey,
                 'idempotency_request_hash' => $idempotencyKey === null ? null : $requestHash,
+                'reserved_at' => now(),
             ]);
 
             if ($name === null) {
@@ -108,7 +109,11 @@ class OrderService
                 $this->releaseStock($lockedOrder);
             }
 
-            $lockedOrder->update(['status' => $status]);
+            $lockedOrder->update([
+                'status' => $status,
+                'paid_at' => $status === 'paid' ? now() : null,
+                'cancelled_at' => $status === 'cancelled' ? now() : null,
+            ]);
 
             return $this->findWithRelations($lockedOrder);
         }, attempts: 3);
@@ -155,7 +160,9 @@ class OrderService
             $unitPriceCents = $listPriceCents - $discountCents;
             $subtotalCents = $unitPriceCents * $submittedItem['quantity'];
             $totalCents += $subtotalCents;
-            $product->decrement('quantity', $submittedItem['quantity']);
+            $product->decrement('quantity', $submittedItem['quantity'], [
+                'version' => $product->version + 1,
+            ]);
             $pivotItems[$product->id] = [
                 'product_name' => $product->name,
                 'product_sku' => $product->sku,
@@ -175,7 +182,12 @@ class OrderService
         $order->loadMissing('products');
 
         foreach ($order->products->sortBy('id') as $product) {
-            Product::query()->whereKey($product->id)->lockForUpdate()->first()?->increment('quantity', $product->pivot->quantity);
+            $lockedProduct = Product::withTrashed()->whereKey($product->id)->lockForUpdate()->first();
+            if ($lockedProduct !== null) {
+                $lockedProduct->increment('quantity', $product->pivot->quantity, [
+                    'version' => $lockedProduct->version + 1,
+                ]);
+            }
         }
     }
 

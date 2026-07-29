@@ -3,46 +3,65 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\ListOrdersRequest;
 use App\Http\Requests\Api\V1\StoreOrderRequest;
+use App\Http\Requests\Api\V1\UpdateOrderRequest;
+use App\Http\Resources\Api\V1\OrderResource;
 use App\Models\Order;
 use App\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Symfony\Component\HttpFoundation\Response;
 
 class OrderController extends Controller
 {
     public function __construct(private readonly OrderService $orderService) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(ListOrdersRequest $request): AnonymousResourceCollection
     {
-        return response()->json(
-            $this->orderService->getListPaginated(
-                filters: [
-                    'user_id' => $request->user()->id,
-                    'name' => $request->input('name'),
-                    'status' => $request->input('status'),
-                ],
-                perPage: min(max($request->integer('per_page', 10), 1), 100),
-            ),
-        );
+        return OrderResource::collection($this->orderService->getListPaginated(
+            filters: [
+                ...$request->validated(),
+                'user_id' => $request->user()->id,
+            ],
+            perPage: $request->integer('per_page', 10),
+        ));
     }
 
-    public function show(Order $order): JsonResponse
+    public function show(Request $request, Order $order): OrderResource
     {
-        $this->authorize('view', $order);
+        abort_unless($request->user()->can('view', $order), 404);
 
-        return response()->json($this->orderService->findWithRelations($order));
+        return new OrderResource($this->orderService->findWithRelations($order));
     }
 
     public function store(StoreOrderRequest $request): JsonResponse
     {
-        return response()->json(
-            $this->orderService->createOrder(
-                user: $request->user(),
-                items: $request->validated('products'),
-                idempotencyKey: $request->validated('idempotency_key'),
-            ),
-            201,
+        $order = $this->orderService->createOrder(
+            user: $request->user(),
+            items: $request->validated('items'),
+            name: $request->validated('name'),
+            idempotencyKey: $request->validated('idempotency_key'),
         );
+
+        return (new OrderResource($order))->response()->setStatusCode(201);
+    }
+
+    public function update(UpdateOrderRequest $request, Order $order): OrderResource
+    {
+        return new OrderResource($this->orderService->updateOrder(
+            order: $order,
+            name: $request->validated('name'),
+            items: $request->validated('items'),
+        ));
+    }
+
+    public function destroy(Request $request, Order $order): Response
+    {
+        abort_unless($request->user()->can('delete', $order), 404);
+        $this->orderService->deleteOrder($order);
+
+        return response()->noContent();
     }
 }

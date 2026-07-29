@@ -25,12 +25,12 @@ class OrderApiTest extends TestCase
             'subtotal' => 40,
         ]);
 
-        $this->actingAs($user)->getJson('/api/orders?per_page=1')
+        $this->actingAs($user)->getJson('/api/v1/orders?per_page=1')
             ->assertOk()
-            ->assertJsonPath('per_page', 1)
+            ->assertJsonPath('meta.per_page', 1)
             ->assertJsonPath('data.0.id', $order->id)
-            ->assertJsonPath('data.0.user_id', $user->id)
-            ->assertJsonPath('data.0.products_count', 1);
+            ->assertJsonPath('data.0.user_id', (string) $user->id)
+            ->assertJsonPath('data.0.items_count', 1);
     }
 
     public function test_an_order_includes_user_products_and_pivot_values(): void
@@ -44,13 +44,13 @@ class OrderApiTest extends TestCase
             'subtotal' => 37.50,
         ]);
 
-        $this->actingAs($user)->getJson('/api/orders/'.$order->id)
+        $this->actingAs($user)->getJson('/api/v1/orders/'.$order->id)
             ->assertOk()
-            ->assertJsonPath('user_id', $user->id)
-            ->assertJsonPath('products.0.id', $product->id)
-            ->assertJsonPath('products.0.pivot.quantity', 3)
-            ->assertJsonPath('products.0.pivot.unit_price', '12.50')
-            ->assertJsonPath('products.0.pivot.subtotal', '37.50');
+            ->assertJsonPath('data.user_id', (string) $user->id)
+            ->assertJsonPath('data.items.0.product_id', $product->id)
+            ->assertJsonPath('data.items.0.quantity', 3)
+            ->assertJsonPath('data.items.0.unit_price', '12.50')
+            ->assertJsonPath('data.items.0.subtotal', '37.50');
     }
 
     public function test_an_order_can_be_created_with_calculated_prices(): void
@@ -59,20 +59,22 @@ class OrderApiTest extends TestCase
         $firstProduct = Product::factory()->create(['price' => 19.95, 'discount' => 1.95, 'quantity' => 10, 'is_active' => true]);
         $secondProduct = Product::factory()->create(['price' => 5.50, 'discount' => 0, 'quantity' => 10, 'is_active' => true]);
 
-        $response = $this->actingAs($user)->postJson('/api/orders', [
-            'products' => [
-                ['product_id' => $firstProduct->id, 'quantity' => 2],
-                ['product_id' => $secondProduct->id, 'quantity' => 3],
-            ],
-        ]);
+        $response = $this->actingAs($user)
+            ->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/orders', [
+                'items' => [
+                    ['product_id' => $firstProduct->id, 'quantity' => 2],
+                    ['product_id' => $secondProduct->id, 'quantity' => 3],
+                ],
+            ]);
 
         $order = Order::query()->sole();
         $response
             ->assertCreated()
-            ->assertJsonPath('id', $order->id)
-            ->assertJsonPath('status', 'pending')
-            ->assertJsonPath('total_price', '52.50')
-            ->assertJsonCount(2, 'products');
+            ->assertJsonPath('data.id', $order->id)
+            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.total_price', '52.50')
+            ->assertJsonCount(2, 'data.items');
 
         $this->assertSame($user->id, $order->user_id);
         $this->assertDatabaseHas('order_product', [
@@ -90,15 +92,15 @@ class OrderApiTest extends TestCase
         $product = Product::factory()->create();
 
         $user = User::factory()->create();
-        $this->actingAs($user)->postJson('/api/orders', [
-            'products' => [
+        $this->actingAs($user)->withHeader('Idempotency-Key', (string) Str::uuid())->postJson('/api/v1/orders', [
+            'items' => [
                 ['product_id' => $product->id, 'quantity' => 0],
                 ['product_id' => $product->id, 'quantity' => 1],
             ],
         ])->assertUnprocessable()
             ->assertJsonValidationErrors([
-                'products.0.quantity',
-                'products.1.product_id',
+                'items.0.quantity',
+                'items.1.product_id',
             ]);
     }
 
@@ -107,21 +109,20 @@ class OrderApiTest extends TestCase
         $user = User::factory()->create();
         $order = Order::factory()->for($user)->create(['status' => 'pending']);
 
-        $this->actingAs($user)->patchJson('/api/orders/'.$order->id.'/status', ['status' => 'paid'])
+        $this->actingAs($user)->postJson('/api/v1/internal/orders/'.$order->id.'/paid')
             ->assertOk()
-            ->assertJsonPath('status', 'paid');
+            ->assertJsonPath('data.status', 'paid');
 
         $this->assertSame('paid', $order->refresh()->status);
     }
 
-    public function test_order_status_rejects_unknown_values(): void
+    public function test_only_pending_orders_can_be_changed(): void
     {
         $user = User::factory()->create();
-        $order = Order::factory()->for($user)->create(['status' => 'pending']);
+        $order = Order::factory()->for($user)->create(['status' => 'paid']);
 
-        $this->actingAs($user)->patchJson('/api/orders/'.$order->id.'/status', ['status' => 'shipped'])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('status');
+        $this->actingAs($user)->postJson('/api/v1/orders/'.$order->id.'/cancel')
+            ->assertNotFound();
     }
 
     public function test_a_user_cannot_view_another_users_order(): void
@@ -129,8 +130,8 @@ class OrderApiTest extends TestCase
         $order = Order::factory()->create();
 
         $this->actingAs(User::factory()->create())
-            ->getJson('/api/orders/'.$order->id)
-            ->assertForbidden();
+            ->getJson('/api/v1/orders/'.$order->id)
+            ->assertNotFound();
     }
 
     public function test_order_creation_is_idempotent_and_uses_identity_from_session(): void
@@ -143,15 +144,40 @@ class OrderApiTest extends TestCase
             'is_active' => true,
         ]);
         $idempotencyKey = (string) Str::uuid();
-        $payload = ['products' => [['product_id' => $product->id, 'quantity' => 2]]];
+        $payload = ['items' => [['product_id' => $product->id, 'quantity' => 2]]];
 
-        $first = $this->actingAs($user)->withHeader('Idempotency-Key', $idempotencyKey)->postJson('/api/orders', $payload);
-        $second = $this->actingAs($user)->withHeader('Idempotency-Key', $idempotencyKey)->postJson('/api/orders', $payload);
+        $first = $this->actingAs($user)->withHeader('Idempotency-Key', $idempotencyKey)->postJson('/api/v1/orders', $payload);
+        $second = $this->actingAs($user)->withHeader('Idempotency-Key', $idempotencyKey)->postJson('/api/v1/orders', $payload);
 
         $first->assertCreated();
-        $second->assertCreated()->assertJsonPath('id', $first->json('id'));
+        $second->assertCreated()->assertJsonPath('data.id', $first->json('data.id'));
         $this->assertDatabaseCount('orders', 1);
         $this->assertSame(2, $product->refresh()->quantity);
+    }
+
+    public function test_pending_order_can_be_updated_and_deleted(): void
+    {
+        $user = User::factory()->create();
+        $firstProduct = Product::factory()->create(['quantity' => 5, 'is_active' => true]);
+        $secondProduct = Product::factory()->create(['price' => 15, 'discount' => 5, 'quantity' => 5, 'is_active' => true]);
+        $order = app(OrderService::class)->createOrder(
+            $user,
+            [['product_id' => $firstProduct->id, 'quantity' => 2]],
+            'Original order',
+        );
+
+        $this->actingAs($user)->putJson('/api/v1/orders/'.$order->id, [
+            'name' => 'Updated order',
+            'items' => [['product_id' => $secondProduct->id, 'quantity' => 3]],
+        ])->assertOk()
+            ->assertJsonPath('data.name', 'Updated order')
+            ->assertJsonPath('data.total_price', '30.00');
+
+        $this->assertSame(5, $firstProduct->refresh()->quantity);
+        $this->assertSame(2, $secondProduct->refresh()->quantity);
+        $this->actingAs($user)->deleteJson('/api/v1/orders/'.$order->id)->assertNoContent();
+        $this->assertModelMissing($order);
+        $this->assertSame(5, $secondProduct->refresh()->quantity);
     }
 
     public function test_cancelling_an_order_releases_reserved_stock(): void
@@ -164,9 +190,9 @@ class OrderApiTest extends TestCase
         );
 
         $this->actingAs($user)
-            ->patchJson('/api/orders/'.$order->id.'/status', ['status' => 'cancelled'])
+            ->postJson('/api/v1/orders/'.$order->id.'/cancel')
             ->assertOk()
-            ->assertJsonPath('status', 'cancelled');
+            ->assertJsonPath('data.status', 'cancelled');
 
         $this->assertSame(3, $product->refresh()->quantity);
     }

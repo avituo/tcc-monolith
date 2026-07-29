@@ -2,10 +2,8 @@
 
 namespace App\Http\Requests\Api\V1;
 
-use App\Models\Product;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreOrderRequest extends FormRequest
 {
@@ -20,16 +18,17 @@ class StoreOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'idempotency_key' => ['nullable', 'uuid'],
-            'products' => ['required', 'array', 'list', 'min:1'],
-            'products.*' => ['required', 'array:product_id,quantity'],
-            'products.*.product_id' => [
+            'idempotency_key' => ['required', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
+            'items' => ['required', 'array', 'list', 'min:1', 'max:100'],
+            'items.*' => ['required', 'array:product_id,quantity'],
+            'items.*.product_id' => [
                 'required',
                 'integer',
                 'distinct',
-                Rule::exists(Product::class, 'id'),
+                'exists:products,id',
             ],
-            'products.*.quantity' => ['required', 'integer', 'min:1', 'max:9999'],
+            'items.*.quantity' => ['required', 'integer', 'min:1', 'max:9999'],
         ];
     }
 

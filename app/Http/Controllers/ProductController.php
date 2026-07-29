@@ -63,7 +63,10 @@ class ProductController extends Controller
 
     public function update(UpdateProductRequest $request, Product $product): RedirectResponse
     {
-        $product->update($this->productAttributes($request->validated()));
+        $product->update([
+            ...$this->productAttributes($request->validated()),
+            'version' => $product->version + 1,
+        ]);
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Product updated successfully.']);
 
         return to_route('products.show', $product);
@@ -71,8 +74,9 @@ class ProductController extends Controller
 
     public function destroy(Product $product): RedirectResponse
     {
+        $product->update(['is_active' => false, 'version' => $product->version + 1]);
+
         if ($product->orders()->exists()) {
-            $product->update(['is_active' => false]);
             Inertia::flash('toast', ['type' => 'success', 'message' => 'Product deactivated to preserve order history.']);
         } else {
             $product->delete();
