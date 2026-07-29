@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
-import { Pencil, Plus, Trash2 } from '@lucide/vue';
+import { Form, Head, Link, router } from '@inertiajs/vue3';
+import { Eye, Pencil, Plus, Trash2 } from '@lucide/vue';
 import {
     create,
     destroy,
@@ -12,10 +12,17 @@ import CrudPagination from '@/components/CrudPagination.vue';
 import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { Order, Paginated } from '@/types';
 
 defineProps<{
     orders: Paginated<Order>;
+    filters: {
+        name: string | null;
+        status: Order['status'] | null;
+        per_page: number;
+    };
 }>();
 
 defineOptions({
@@ -64,6 +71,61 @@ function statusVariant(
                 </Link>
             </Button>
         </div>
+
+        <Form
+            v-bind="index.form()"
+            class="grid gap-4 rounded-xl border bg-card p-4 md:grid-cols-[minmax(0,1fr)_12rem_8rem_auto] md:items-end"
+            #default="{ processing }"
+        >
+            <div class="grid gap-2">
+                <Label for="order-name">Name</Label>
+                <Input
+                    id="order-name"
+                    name="name"
+                    type="search"
+                    :default-value="filters.name ?? ''"
+                    placeholder="Search orders"
+                />
+            </div>
+
+            <div class="grid gap-2">
+                <Label for="order-status">Status</Label>
+                <select
+                    id="order-status"
+                    name="status"
+                    :value="filters.status ?? ''"
+                    class="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+                >
+                    <option value="">All statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+            </div>
+
+            <div class="grid gap-2">
+                <Label for="order-page-size">Per page</Label>
+                <select
+                    id="order-page-size"
+                    name="per_page"
+                    :value="filters.per_page"
+                    class="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+                >
+                    <option :value="10">10</option>
+                    <option :value="25">25</option>
+                    <option :value="50">50</option>
+                </select>
+            </div>
+
+            <div class="flex gap-2">
+                <Button type="submit" :disabled="processing">
+                    {{ processing ? 'Filtering...' : 'Filter' }}
+                </Button>
+                <Button variant="outline" as-child>
+                    <Link :href="index()">Clear</Link>
+                </Button>
+            </div>
+        </Form>
 
         <div class="overflow-hidden rounded-xl border">
             <div class="overflow-x-auto">
@@ -119,6 +181,19 @@ function statusVariant(
                                         as-child
                                     >
                                         <Link
+                                            :href="show(order.id)"
+                                            aria-label="View order"
+                                        >
+                                            <Eye />
+                                        </Link>
+                                    </Button>
+                                    <Button
+                                        v-if="order.status === 'pending'"
+                                        variant="outline"
+                                        size="icon-sm"
+                                        as-child
+                                    >
+                                        <Link
                                             :href="edit(order.id)"
                                             aria-label="Edit order"
                                         >
@@ -126,6 +201,7 @@ function statusVariant(
                                         </Link>
                                     </Button>
                                     <Button
+                                        v-if="order.status === 'pending'"
                                         variant="destructive"
                                         size="icon-sm"
                                         aria-label="Delete order"
@@ -141,7 +217,7 @@ function statusVariant(
                                 colspan="6"
                                 class="px-4 py-12 text-center text-muted-foreground"
                             >
-                                No orders have been created.
+                                No orders match the selected filters.
                             </td>
                         </tr>
                     </tbody>

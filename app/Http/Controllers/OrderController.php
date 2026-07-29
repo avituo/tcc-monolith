@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ListOrdersRequest;
 use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\UpdateOrderRequest;
 use App\Models\Order;
 use App\Models\Product;
 use App\Services\OrderService;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -18,14 +17,23 @@ class OrderController extends Controller
 {
     public function __construct(private readonly OrderService $orderService) {}
 
-    public function index(): Response
+    public function index(ListOrdersRequest $request): Response
     {
+        $filters = $request->validated();
+
         return Inertia::render('orders/Index', [
-            'orders' => Order::query()
-                ->whereBelongsTo(request()->user())
-                ->withCount('products')
-                ->latest('id')
-                ->paginate(10),
+            'orders' => $this->orderService->getListPaginated(
+                filters: [
+                    ...$filters,
+                    'user_id' => $request->user()->id,
+                ],
+                perPage: (int) ($filters['per_page'] ?? 10),
+            )->withQueryString(),
+            'filters' => [
+                'name' => $filters['name'] ?? null,
+                'status' => $filters['status'] ?? null,
+                'per_page' => (int) ($filters['per_page'] ?? 10),
+            ],
         ]);
     }
 
@@ -86,18 +94,6 @@ class OrderController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Order deleted successfully.']);
 
         return to_route('orders.index');
-    }
-
-    public function getList(Request $request): JsonResponse
-    {
-        $filters = [
-            'name' => $request->input('name'),
-            'status' => $request->input('status'),
-        ];
-
-        $orders = $this->orderService->getListPaginated($filters, $request->integer('per_page', 10));
-
-        return response()->json($orders);
     }
 
     /**

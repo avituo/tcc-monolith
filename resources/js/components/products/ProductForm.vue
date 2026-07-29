@@ -118,7 +118,7 @@ withDefaults(
                 id="image"
                 name="image"
                 type="url"
-                :default-value="product?.image"
+                :default-value="product?.image ?? ''"
                 placeholder="https://example.com/product.jpg"
             />
             <InputError :message="errors.image" />

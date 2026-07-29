@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Pencil, Trash2 } from '@lucide/vue';
+import { CircleCheckBig, CircleX, Pencil, Trash2 } from '@lucide/vue';
+import { ref } from 'vue';
 import {
     destroy,
     edit,
     index,
 } from '@/actions/App/Http/Controllers/OrderController';
+import UpdateOrderStatusController from '@/actions/App/Http/Controllers/UpdateOrderStatusController';
 import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +16,7 @@ import type { Order } from '@/types';
 const props = defineProps<{
     order: Order;
 }>();
+const updatingStatus = ref<Order['status'] | null>(null);
 
 defineOptions({
     layout: {
@@ -28,6 +31,28 @@ function remove(): void {
     if (window.confirm(`Delete "${props.order.name}"?`)) {
         router.delete(destroy(props.order.id));
     }
+}
+
+function updateStatus(status: 'paid' | 'cancelled'): void {
+    const action = status === 'paid' ? 'mark as paid' : 'cancel';
+
+    if (!window.confirm(`Are you sure you want to ${action} this order?`)) {
+        return;
+    }
+
+    router.patch(
+        UpdateOrderStatusController(props.order.id),
+        { status },
+        {
+            preserveScroll: true,
+            onStart: () => {
+                updatingStatus.value = status;
+            },
+            onFinish: () => {
+                updatingStatus.value = null;
+            },
+        },
+    );
 }
 
 function money(value: string | number): string {
@@ -54,7 +79,28 @@ function statusVariant(
     <div class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
         <div class="flex flex-wrap items-start justify-between gap-4">
             <Heading :title="order.name" :description="`Order #${order.id}`" />
-            <div class="flex gap-2">
+            <div v-if="order.status === 'pending'" class="flex flex-wrap gap-2">
+                <Button
+                    :disabled="updatingStatus !== null"
+                    @click="updateStatus('paid')"
+                >
+                    <CircleCheckBig />
+                    {{
+                        updatingStatus === 'paid' ? 'Updating...' : 'Mark paid'
+                    }}
+                </Button>
+                <Button
+                    variant="destructive"
+                    :disabled="updatingStatus !== null"
+                    @click="updateStatus('cancelled')"
+                >
+                    <CircleX />
+                    {{
+                        updatingStatus === 'cancelled'
+                            ? 'Cancelling...'
+                            : 'Cancel order'
+                    }}
+                </Button>
                 <Button variant="outline" as-child>
                     <Link :href="edit(order.id)">
                         <Pencil />

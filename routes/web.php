@@ -2,13 +2,15 @@
 
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\UpdateOrderStatusController;
 use Illuminate\Support\Facades\Route;
 
-Route::inertia('/', 'Welcome')->name('home');
+Route::redirect('/', '/products')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
     Route::resource('products', ProductController::class);
+    Route::patch('orders/{order}/status', UpdateOrderStatusController::class)
+        ->name('orders.status.update');
     Route::resource('orders', OrderController::class);
 });
 

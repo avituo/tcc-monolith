@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Form, Head, Link, router } from '@inertiajs/vue3';
 import { Pencil, Plus, Trash2 } from '@lucide/vue';
 import {
     create,
@@ -12,10 +12,17 @@ import CrudPagination from '@/components/CrudPagination.vue';
 import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { Paginated, Product } from '@/types';
 
 defineProps<{
     products: Paginated<Product>;
+    filters: {
+        name: string | null;
+        is_active: boolean | null;
+        per_page: number;
+    };
 }>();
 
 defineOptions({
@@ -54,6 +61,66 @@ function money(value: string): string {
                 </Link>
             </Button>
         </div>
+
+        <Form
+            v-bind="index.form()"
+            class="grid gap-4 rounded-xl border bg-card p-4 md:grid-cols-[minmax(0,1fr)_12rem_8rem_auto] md:items-end"
+            #default="{ processing }"
+        >
+            <div class="grid gap-2">
+                <Label for="product-name">Name</Label>
+                <Input
+                    id="product-name"
+                    name="name"
+                    type="search"
+                    :default-value="filters.name ?? ''"
+                    placeholder="Search products"
+                />
+            </div>
+
+            <div class="grid gap-2">
+                <Label for="product-status">Status</Label>
+                <select
+                    id="product-status"
+                    name="is_active"
+                    :value="
+                        filters.is_active === null
+                            ? ''
+                            : filters.is_active
+                              ? '1'
+                              : '0'
+                    "
+                    class="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+                >
+                    <option value="">All statuses</option>
+                    <option value="1">Active</option>
+                    <option value="0">Inactive</option>
+                </select>
+            </div>
+
+            <div class="grid gap-2">
+                <Label for="product-page-size">Per page</Label>
+                <select
+                    id="product-page-size"
+                    name="per_page"
+                    :value="filters.per_page"
+                    class="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+                >
+                    <option :value="10">10</option>
+                    <option :value="25">25</option>
+                    <option :value="50">50</option>
+                </select>
+            </div>
+
+            <div class="flex gap-2">
+                <Button type="submit" :disabled="processing">
+                    {{ processing ? 'Filtering...' : 'Filter' }}
+                </Button>
+                <Button variant="outline" as-child>
+                    <Link :href="index()">Clear</Link>
+                </Button>
+            </div>
+        </Form>
 
         <div class="overflow-hidden rounded-xl border">
             <div class="overflow-x-auto">
@@ -147,7 +214,7 @@ function money(value: string): string {
                                 colspan="6"
                                 class="px-4 py-12 text-center text-muted-foreground"
                             >
-                                No products have been created.
+                                No products match the selected filters.
                             </td>
                         </tr>
                     </tbody>

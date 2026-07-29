@@ -2,13 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ListProductsRequest;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Models\Product;
 use App\Services\ProductService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,12 +15,22 @@ class ProductController extends Controller
 {
     public function __construct(private readonly ProductService $productService) {}
 
-    public function index(): Response
+    public function index(ListProductsRequest $request): Response
     {
+        $filters = $request->validated();
+
         return Inertia::render('products/Index', [
-            'products' => Product::query()
-                ->latest('id')
-                ->paginate(10),
+            'products' => $this->productService->getListPaginated(
+                filters: $filters,
+                perPage: (int) ($filters['per_page'] ?? 10),
+            )->withQueryString(),
+            'filters' => [
+                'name' => $filters['name'] ?? null,
+                'is_active' => array_key_exists('is_active', $filters)
+                    ? (bool) $filters['is_active']
+                    : null,
+                'per_page' => (int) ($filters['per_page'] ?? 10),
+            ],
         ]);
     }
 
@@ -71,18 +80,6 @@ class ProductController extends Controller
         }
 
         return to_route('products.index');
-    }
-
-    public function getList(Request $request): JsonResponse
-    {
-        $filters = [
-            'name' => $request->input('name'),
-            'is_active' => $request->input('is_active'),
-        ];
-
-        $products = $this->productService->getListPaginated($filters, $request->integer('per_page', 10));
-
-        return response()->json($products);
     }
 
     /**

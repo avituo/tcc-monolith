@@ -33,6 +33,29 @@ class ProductCrudTest extends TestCase
                 ->where('product.id', $product->id));
     }
 
+    public function test_products_can_be_filtered_by_name_activity_and_page_size(): void
+    {
+        $user = User::factory()->create();
+        Product::factory()->create(['name' => 'Active Keyboard', 'is_active' => true]);
+        Product::factory()->create(['name' => 'Inactive Keyboard', 'is_active' => false]);
+        Product::factory()->create(['name' => 'Active Mouse', 'is_active' => true]);
+
+        $this->actingAs($user)
+            ->get(route('products.index', [
+                'name' => 'Keyboard',
+                'is_active' => '1',
+                'per_page' => 25,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('products/Index')
+                ->has('products.data', 1)
+                ->where('products.data.0.name', 'Active Keyboard')
+                ->where('filters.name', 'Keyboard')
+                ->where('filters.is_active', true)
+                ->where('filters.per_page', 25));
+    }
+
     public function test_authenticated_users_can_create_update_and_delete_products(): void
     {
         $user = User::factory()->create();
