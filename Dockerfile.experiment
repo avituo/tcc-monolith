@@ -1,0 +1,11 @@
+FROM tcc-laravel-experiment:php8.4.19
+
+WORKDIR /var/www
+
+COPY . .
+
+RUN composer install --no-interaction --prefer-dist --classmap-authoritative
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "php artisan config:cache && php artisan route:cache && exec php artisan serve --host=0.0.0.0 --port=8000"]

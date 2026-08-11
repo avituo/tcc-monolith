@@ -1,0 +1,166 @@
+#!/bin/sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PROJECT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+CONTAINER_ROOT=$(CDPATH= cd -- "$PROJECT_ROOT/../tcc-container" && pwd)
+ENV_FILE="$PROJECT_ROOT/.env.experiment"
+COMPOSE_FILE="$PROJECT_ROOT/docker-compose.experiment.yml"
+COMPOSE_PROJECT=tcc-monolith-experiment
+
+compose()
+{
+    docker compose --env-file "$ENV_FILE" --project-name "$COMPOSE_PROJECT" --file "$COMPOSE_FILE" "$@"
+}
+
+initialize_environment()
+{
+    if [ -f "$ENV_FILE" ]; then
+        printf '%s\n' "Experiment environment already exists: $ENV_FILE"
+        return
+    fi
+
+    umask 077
+    app_key="base64:$(openssl rand -base64 32 | tr -d '\n')"
+    db_password=$(openssl rand -hex 24)
+    root_password=$(openssl rand -hex 24)
+
+    {
+        printf 'TCC_MONOLITH_APP_KEY=%s\n' "$app_key"
+        printf 'TCC_DB_PASSWORD=%s\n' "$db_password"
+        printf 'TCC_DB_ROOT_PASSWORD=%s\n' "$root_password"
+    } > "$ENV_FILE"
+
+    printf '%s\n' "Created protected experiment environment: $ENV_FILE"
+}
+
+require_environment()
+{
+    if [ ! -f "$ENV_FILE" ]; then
+        printf '%s\n' "Missing $ENV_FILE. Run: $0 init" >&2
+        exit 1
+    fi
+}
+
+wait_for_http()
+{
+    url=$1
+    attempts=0
+
+    until curl --fail --silent --show-error "$url" >/dev/null 2>&1; do
+        attempts=$((attempts + 1))
+        if [ "$attempts" -ge 60 ]; then
+            printf 'Timed out waiting for %s\n' "$url" >&2
+            return 1
+        fi
+        sleep 1
+    done
+}
+
+start_stack()
+{
+    require_environment
+    docker build --file "$CONTAINER_ROOT/Dockerfile.experiment-base" \
+        --tag tcc-laravel-experiment:php8.4.19 "$CONTAINER_ROOT"
+    compose build monolith
+    compose up --detach mysql monolith
+    wait_for_http http://localhost:18000/up
+    compose exec -T monolith php -v
+    if compose exec -T monolith php -m | grep -qi xdebug; then
+        printf '%s\n' 'Xdebug must not be loaded in the experiment runtime.' >&2
+        exit 1
+    fi
+    compose exec -T monolith php artisan about --only=environment
+    printf '%s\n' 'Monolith experiment URL: http://localhost:18000'
+}
+
+reset_dataset()
+{
+    require_environment
+    compose up --detach mysql monolith
+    printf '%s\n' 'Reset target: tcc_monolith_experiment'
+    compose exec -T monolith php artisan optimize:clear
+    compose exec -T monolith php artisan migrate:fresh --seed --force
+    compose exec -T monolith php artisan config:cache
+    compose exec -T monolith php artisan route:cache
+    compose exec -T monolith php artisan experiment:dataset:validate
+}
+
+validate_dataset()
+{
+    require_environment
+    compose exec -T monolith php artisan experiment:dataset:validate
+}
+
+prepare_authentication()
+{
+    require_environment
+    output_directory=${1:-"$PROJECT_ROOT/.experiment-auth"}
+    mkdir -p "$output_directory"
+    chmod 700 "$output_directory"
+
+    cookie_jar="$output_directory/monolith.cookies"
+    csrf_file="$output_directory/monolith.csrf"
+    csrf_response=$(curl --fail --silent --show-error \
+        --cookie-jar "$cookie_jar" \
+        --cookie "$cookie_jar" \
+        http://localhost:18000/experiment/auth/csrf)
+    csrf_token=$(printf '%s' "$csrf_response" | php -r '$data = json_decode(stream_get_contents(STDIN), true, flags: JSON_THROW_ON_ERROR); echo $data["csrf_token"];')
+
+    curl --fail --silent --show-error \
+        --output /dev/null \
+        --cookie-jar "$cookie_jar" \
+        --cookie "$cookie_jar" \
+        --header 'Accept: application/json' \
+        --header 'Content-Type: application/json' \
+        --header "X-CSRF-TOKEN: $csrf_token" \
+        --data '{"email":"benchmark-user-001@example.test","password":"benchmark-password"}' \
+        http://localhost:18000/login
+
+    csrf_response=$(curl --fail --silent --show-error \
+        --cookie-jar "$cookie_jar" \
+        --cookie "$cookie_jar" \
+        http://localhost:18000/experiment/auth/csrf)
+    printf '%s' "$csrf_response" | php -r '$data = json_decode(stream_get_contents(STDIN), true, flags: JSON_THROW_ON_ERROR); echo $data["csrf_token"], PHP_EOL;' > "$csrf_file"
+    chmod 600 "$cookie_jar" "$csrf_file"
+
+    curl --fail --silent --show-error \
+        --output /dev/null \
+        --cookie "$cookie_jar" \
+        --header 'Accept: application/json' \
+        http://localhost:18000/api/v1/products
+
+    printf 'Monolith authentication prepared in %s\n' "$output_directory"
+    printf '%s\n' 'Login/token acquisition is complete and must remain outside timed commerce requests.'
+}
+
+case "${1:-}" in
+    init)
+        initialize_environment
+        ;;
+    start)
+        start_stack
+        ;;
+    reset)
+        reset_dataset
+        ;;
+    validate)
+        validate_dataset
+        ;;
+    auth)
+        prepare_authentication "${2:-}"
+        ;;
+    stop)
+        require_environment
+        compose down --remove-orphans
+        ;;
+    destroy)
+        require_environment
+        compose down --volumes --remove-orphans
+        ;;
+    *)
+        printf 'Usage: %s {init|start|reset|validate|auth [output-directory]|stop|destroy}\n' "$0" >&2
+        exit 1
+        ;;
+esac
+

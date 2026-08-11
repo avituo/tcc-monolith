@@ -127,7 +127,7 @@ class OrderApiTest extends TestCase
 
     public function test_a_user_cannot_view_another_users_order(): void
     {
-        $order = Order::factory()->create();
+        $order = Order::factory()->for(User::factory())->create();
 
         $this->actingAs(User::factory()->create())
             ->getJson('/api/v1/orders/'.$order->id)

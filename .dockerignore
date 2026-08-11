@@ -1,0 +1,16 @@
+.git
+.codex
+.cursor
+.idea
+.env
+.env.*
+!.env.example
+node_modules
+vendor
+bootstrap/cache/*.php
+public/build
+public/hot
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*

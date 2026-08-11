@@ -37,7 +37,7 @@ class AppServiceProvider extends ServiceProvider
         Date::use(CarbonImmutable::class);
 
         DB::prohibitDestructiveCommands(
-            app()->isProduction(),
+            app()->isProduction() && ! config('experiment.allow_destructive_reset'),
         );
 
         Password::defaults(fn (): ?Password => app()->isProduction()
@@ -51,6 +51,10 @@ class AppServiceProvider extends ServiceProvider
         );
 
         RateLimiter::for('api', function (Request $request): Limit {
+            if (config('experiment.disable_rate_limiting')) {
+                return Limit::none();
+            }
+
             return Limit::perMinute(120)->by((string) ($request->user()?->getAuthIdentifier() ?: $request->ip()));
         });
     }

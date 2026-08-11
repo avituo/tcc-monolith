@@ -1,0 +1,66 @@
+services:
+  mysql:
+    image: mysql:8.4.8@sha256:2952e3be7807f06fc18de50b3ea1a632d5c70d63482ff7d7376fe3aa8999babf
+    environment:
+      MYSQL_ROOT_PASSWORD: ${TCC_DB_ROOT_PASSWORD:?Set TCC_DB_ROOT_PASSWORD in .env.experiment}
+      MYSQL_DATABASE: tcc_monolith_experiment
+      MYSQL_USER: tcc
+      MYSQL_PASSWORD: ${TCC_DB_PASSWORD:?Set TCC_DB_PASSWORD in .env.experiment}
+      TZ: UTC
+    command: ["--defaults-extra-file=/etc/mysql/conf.d/zz-tcc-experiment.cnf"]
+    volumes:
+      - monolith-experiment-db:/var/lib/mysql
+      - ../tcc-container/docker/mysql/experiment.cnf:/etc/mysql/conf.d/zz-tcc-experiment.cnf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+    mem_limit: 1g
+    networks:
+      - experiment
+
+  monolith:
+    build:
+      context: .
+      dockerfile: Dockerfile.experiment
+    image: tcc-monolith-experiment:php8.4.19
+    environment:
+      APP_NAME: TCC Monolith Experiment
+      APP_ENV: production
+      APP_KEY: ${TCC_MONOLITH_APP_KEY:?Set TCC_MONOLITH_APP_KEY in .env.experiment}
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:18000
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: warning
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: tcc_monolith_experiment
+      DB_USERNAME: tcc
+      DB_PASSWORD: ${TCC_DB_PASSWORD:?Set TCC_DB_PASSWORD in .env.experiment}
+      CACHE_STORE: array
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: sync
+      BCRYPT_ROUNDS: 12
+      TCC_EXPERIMENT_SESSION_AUTH: "true"
+      TCC_EXPERIMENT_ALLOW_RESET: "true"
+      TCC_EXPERIMENT_DISABLE_RATE_LIMITING: "true"
+      XDEBUG_MODE: "off"
+      TZ: UTC
+    ports:
+      - "18000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    init: true
+    mem_limit: 1g
+    networks:
+      - experiment
+
+volumes:
+  monolith-experiment-db:
+
+networks:
+  experiment:
+    driver: bridge

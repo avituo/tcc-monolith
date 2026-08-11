@@ -38,7 +38,7 @@ class OrderCrudTest extends TestCase
         $user = User::factory()->create();
         Order::factory()->for($user)->create(['name' => 'Pending keyboard', 'status' => 'pending']);
         Order::factory()->for($user)->create(['name' => 'Paid keyboard', 'status' => 'paid']);
-        Order::factory()->create(['name' => 'Paid keyboard from another user', 'status' => 'paid']);
+        Order::factory()->for(User::factory())->create(['name' => 'Paid keyboard from another user', 'status' => 'paid']);
 
         $this->actingAs($user)
             ->get(route('orders.index', [

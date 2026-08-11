@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use App\Models\Order;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class OrderFactory extends Factory
@@ -14,7 +13,6 @@ class OrderFactory extends Factory
     {
         return [
             'name' => 'Pedido #'.fake()->unique()->numberBetween(1000, 99999),
-            'user_id' => User::factory(),
             'user_name_snapshot' => fake()->name(),
             'user_email_snapshot' => fake()->safeEmail(),
             'total_price' => fake()->randomFloat(2, 50, 10000),
