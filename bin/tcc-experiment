@@ -16,7 +16,8 @@ compose()
 initialize_environment()
 {
     if [ -f "$ENV_FILE" ]; then
-        printf '%s\n' "Experiment environment already exists: $ENV_FILE"
+        chmod 600 "$ENV_FILE"
+        printf '%s\n' "Experiment environment already exists and permissions were secured: $ENV_FILE"
         return
     fi
 
@@ -163,4 +164,3 @@ case "${1:-}" in
         exit 1
         ;;
 esac
-
