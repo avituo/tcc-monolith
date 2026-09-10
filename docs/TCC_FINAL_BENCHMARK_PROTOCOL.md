@@ -1,12 +1,16 @@
 # Final TCC Benchmark Protocol
 
-Protocol version: 1  
-Frozen on: 2026-08-11  
-Status: definitive measurements have not been executed.
+Protocol version: 2
+
+Frozen on: 2026-09-10
+
+Status: second definitive result set pending after Laravel version alignment.
 
 ## 1. Experimental question and scope
 
 This protocol compares the existing monolith and microservices implementations under the same deterministic dataset and controlled container runtime. It does not test the frontend and does not introduce or change business behavior.
+
+To remove framework version as a confounding factor, the monolith, Auth Service, Product Service, and Order Service pin and resolve exactly Laravel `13.20.0`. The selected version was already used by all three services; therefore, only the monolith framework package changed (`13.14.0` to `13.20.0`), while its other locked dependencies were retained. The automated parity check runs before builds and conditions. Runtime versions and the SHA-256 of each complete `composer.lock` are checked against the source and stored with the experimental evidence, preventing stale images from entering the result set.
 
 The definitive HTTP experiment has 160 timed architecture runs:
 
@@ -192,7 +196,7 @@ A sample succeeds only if both its HTTP assertion and Groovy JSON semantic asser
 
 ## 11. Run one definitive condition
 
-From `tcc-container`, run exactly one command. Example for scenario A, concurrency 10, R1 monolith:
+From `tcc-container`, run exactly one command. The second result set is isolated with `--result-set laravel-13.20.0`, preserving the earlier mixed-version measurements. Example for scenario A, concurrency 10, R1 monolith:
 
 ```sh
 cd /Users/devnit/Documents/projects/tcc-container
@@ -200,7 +204,8 @@ cd /Users/devnit/Documents/projects/tcc-container
   --architecture monolith \
   --scenario products \
   --concurrency 10 \
-  --repetition 1
+  --repetition 1 \
+  --result-set laravel-13.20.0
 ```
 
 Then run the counterbalanced second half:
@@ -210,7 +215,8 @@ Then run the counterbalanced second half:
   --architecture microservices \
   --scenario products \
   --concurrency 10 \
-  --repetition 1
+  --repetition 1 \
+  --result-set laravel-13.20.0
 ```
 
 Replace `scenario`, `concurrency`, and `repetition` only according to the frozen matrix. The runner rejects unsupported values, refuses to run while the opposite architecture is active, and refuses to overwrite any result directory. It does not provide a command that automatically launches all 160 runs.
@@ -220,7 +226,7 @@ Replace `scenario`, `concurrency`, and `repetition` only according to the frozen
 Definitive results use this hierarchy:
 
 ```text
-benchmark/results/final/{scenario}/c{concurrency}/r{repetition}/{architecture}/
+benchmark/results/laravel-13.20.0/final/{scenario}/c{concurrency}/r{repetition}/{architecture}/
 ```
 
 Every successful condition retains:
@@ -274,11 +280,17 @@ Build time is a separate experiment and is never combined with HTTP results. Use
 
 ```sh
 cd /Users/devnit/Documents/projects/tcc-container
-./benchmark/scripts/run-build-condition.sh --architecture monolith --repetition 1
-./benchmark/scripts/run-build-condition.sh --architecture microservices --repetition 1
+./benchmark/scripts/run-build-condition.sh --architecture monolith --repetition 1 --result-set laravel-13.20.0
+./benchmark/scripts/run-build-condition.sh --architecture microservices --repetition 1 --result-set laravel-13.20.0
 ```
 
 Repeat with repetitions 2 through 5. The script stops both architectures before timing, uses Docker build cache disabled, includes the common PHP experiment-base build in each applicable architecture condition, preserves the complete build log, records nanosecond wall-clock timestamps and exit status, and refuses overwrite. Do not run the HTTP or startup benchmark concurrently.
+
+After the ten build measurements, freeze and validate the exact image set before any definitive HTTP condition:
+
+```sh
+./benchmark/scripts/freeze-final-images.sh --result-set laravel-13.20.0
+```
 
 ## 15. Already-built startup benchmark
 
@@ -286,8 +298,8 @@ Startup time is also separate. Build all images before these measurements. Run f
 
 ```sh
 cd /Users/devnit/Documents/projects/tcc-container
-./benchmark/scripts/run-startup-condition.sh --architecture monolith --repetition 1
-./benchmark/scripts/run-startup-condition.sh --architecture microservices --repetition 1
+./benchmark/scripts/run-startup-condition.sh --architecture monolith --repetition 1 --result-set laravel-13.20.0
+./benchmark/scripts/run-startup-condition.sh --architecture microservices --repetition 1 --result-set laravel-13.20.0
 ```
 
 Repeat with repetitions 2 through 5. The script starts from a stopped architecture with existing images and volumes. Timing begins immediately before `docker compose up --detach --no-build` and ends only after readiness succeeds.
@@ -300,6 +312,7 @@ The script preserves timing, startup/Compose logs, final container state, and th
 ## 16. Frozen limitations and interpretation rules
 
 - The pilot does not validate POST under load; this is intentional because the researcher requested only GET-products for the pilot.
+- Framework version is controlled rather than treated as an architectural characteristic: every request-serving PHP application runs Laravel `13.20.0`, verified in source locks, frozen images, and per-condition metadata.
 - Concurrent microservice POST requests can legitimately return `409 product_version_conflict` because snapshots and reservations are separate distributed steps. Such responses are errors under this protocol and must remain in the results; they must not be retried or removed.
 - Repeated POST successes consume stock. Product 2 can eventually exhaust its deterministic stock during a high-throughput condition. Any resulting non-201 response remains an error. Reset occurs before the next condition.
 - Monolith authentication uses database-backed sessions inside the measured monolith/MySQL boundary; microservices use JWT validation in the measured gateway. This architectural difference is part of the systems being compared.
@@ -311,8 +324,8 @@ The script preserves timing, startup/Compose logs, final container state, and th
 The shorter pilot flag is deliberately restricted to GET products, concurrency 10, repetition 1. It sets warm-up to 10 seconds and measurement to 30 seconds:
 
 ```sh
-./benchmark/scripts/run-condition.sh --architecture monolith --scenario products --concurrency 10 --repetition 1 --pilot
-./benchmark/scripts/run-condition.sh --architecture microservices --scenario products --concurrency 10 --repetition 1 --pilot
+./benchmark/scripts/run-condition.sh --architecture monolith --scenario products --concurrency 10 --repetition 1 --pilot --result-set laravel-13.20.0
+./benchmark/scripts/run-condition.sh --architecture microservices --scenario products --concurrency 10 --repetition 1 --pilot --result-set laravel-13.20.0
 ```
 
-Pilot output is stored under `benchmark/results/pilot/` and must never be included in thesis statistics.
+Pilot output is stored under `benchmark/results/laravel-13.20.0/pilot/` and must never be included in thesis statistics.
